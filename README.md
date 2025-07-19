@@ -33,7 +33,7 @@ AniPusher插件 是将特定Webhook消息推送至QQ的插件<br>
 <summary>使用 nb-cli 安装</summary>
 在 nonebot2 项目的根目录下打开命令行, 输入以下指令即可安装
 
-    nb plugin install nonebot-plugin-AniPusher
+    nb plugin install nonebot-plugin-anipusher
 
 </details>
 
@@ -44,22 +44,22 @@ AniPusher插件 是将特定Webhook消息推送至QQ的插件<br>
 <details>
 <summary>pip</summary>
 
-    pip install nonebot-plugin-AniPusher
+    pip install nonebot-plugin-anipusher
 </details>
 <details>
 <summary>pdm</summary>
 
-    pdm add nonebot-plugin-AniPusher
+    pdm add nonebot-plugin-anipusher
 </details>
 <details>
 <summary>poetry</summary>
 
-    poetry add nonebot-plugin-AniPusher
+    poetry add nonebot-plugin-anipusher
 </details>
 <details>
 <summary>conda</summary>
 
-    conda install nonebot-plugin-AniPusher
+    conda install nonebot-plugin-anipusher
 </details>
 
 打开 nonebot2 项目根目录下的 `pyproject.toml` 文件, 在 `[tool.nonebot]` 部分追加写入
