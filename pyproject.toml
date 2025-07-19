@@ -41,3 +41,9 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["plugins"]
+
+[tool.setuptools]
+packages = {find = {where = ["plugins"]}}
+package-dir = {""="plugins"}
+package-data = {"nonebot_plugin_AniPush" = ["others/*.png"]}
+include-package-data = true
