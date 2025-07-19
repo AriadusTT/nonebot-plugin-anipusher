@@ -1,0 +1,36 @@
+[project]
+name = "nonebot-plugin-AniPusher"
+version = "0.1.0"
+description = "NoneBot plugin for pushing ani-rss/emby webhooks to QQ"
+authors = [
+    { name = "AriadusTT", email = "980868243@qq.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+urls = { Repository = "https://github.com/AriadusTT/nonebot-plugin-AniPusher" }
+requires-python = ">=3.9, <4.0"
+classifiers = [
+    "Framework :: NoneBot",
+    "Programming Language :: Python :: 3.9",
+]
+
+[tool.nonebot]
+adapters = [
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
+]
+plugins = ["nonebot_plugin_apscheduler"]
+plugin_dirs = ["plugins"]
+
+
+[tool.ruff]
+line-length = 120
+select = ["F", "E", "W", "I"]  # 仅保留基础检查
+ignore = ["E402"]
+
+[build-system]
+requires = ["setuptools>=42"]  # 替代 uv_build
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["plugins"]
