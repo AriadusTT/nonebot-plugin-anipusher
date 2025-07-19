@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-anipusher"
-version = "0.1.5"
+version = "0.1.6"
 description = "NoneBot plugin for pushing ani-rss/emby webhooks to QQ"
 authors = [{ name = "AriadusTT", email = "980868243@qq.com" }]
 license = { text = "MIT" }
@@ -25,8 +25,8 @@ classifiers = [
 adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
 ]
-plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_anipusher"]
-plugin_dirs = ["plugins"]
+plugins = ["nonebot_plugin_apscheduler"]
+plugin_dirs = ["nonebot-plugin-anipusher"]
 
 
 [tool.ruff]
@@ -40,10 +40,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = ["plugins"]
+pythonpath = ["."]
 
 [tool.setuptools]
-packages = {find = {where = ["plugins"]}}
-package-dir = {""="plugins"}
-package-data = {"nonebot_plugin_anipusher" = ["others/*.png"]}
+packages = {find = {where = ["."]}}  # 根目录扫描
+package-dir = {"" = "."}
+package-data = {"*" = ["others/*.png", "others/*.jpg"]}
 include-package-data = true
