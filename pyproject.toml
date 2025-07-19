@@ -25,7 +25,7 @@ classifiers = [
 adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
 ]
-plugins = ["nonebot_plugin_apscheduler"]
+plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_anipusher"]
 plugin_dirs = ["plugins"]
 
 
@@ -45,5 +45,5 @@ pythonpath = ["plugins"]
 [tool.setuptools]
 packages = {find = {where = ["plugins"]}}
 package-dir = {""="plugins"}
-package-data = {"nonebot_plugin_AniPush" = ["others/*.png"]}
+package-data = {"nonebot_plugin_anipusher" = ["others/*.png"]}
 include-package-data = true
