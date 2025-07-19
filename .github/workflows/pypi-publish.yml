@@ -33,6 +33,5 @@ jobs:
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
           skip-existing: true  # 如果包已存在则跳过，避免 400 错误
           verbose: true  # 启用详细日志

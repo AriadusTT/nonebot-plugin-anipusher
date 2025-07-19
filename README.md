@@ -13,7 +13,7 @@ NoneBot AniPusher插件 是将特定Webhooks消息推送至QQ的插件<br>
 
 
 
-[![license](https://img.shields.io/github/license/Ariadust/nonebot-plugin-AniPusher.svg?cachebust=1)](./LICENSE)
+[![license](https://img.shields.io/github/license/AriadusTT/nonebot-plugin-anipusher.svg?cachebust=1)](./LICENSE)
 [![pypi](https://img.shields.io/pypi/v/nonebot-plugin-AniPusher.svg)](https://pypi.python.org/pypi/nonebot-plugin-AniPusher)
 [![python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 </div>
