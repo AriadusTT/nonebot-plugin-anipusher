@@ -13,7 +13,7 @@ dependencies = [
     "aiohttp>=3.11.14",
     "DBUtils>=3.1.0",
     "fastapi>=0.116.1",
-    "nonebot>=2.4.0",
+    "nonebot2>=2.4.0",
     "pydantic>=1.10.21",
     "python-dotenv>=1.0.1"
 ]
@@ -41,3 +41,6 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["plugins"]
+
+[tool.setuptools.package-data]
+onebot_plugin_anipusher = ["plugins/nonebot_plugin_AniPush/others/placeholder_image.png"]
