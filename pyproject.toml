@@ -18,7 +18,6 @@ dependencies = [
     "python-dotenv==1.1.1"
 ]
 classifiers = [
-    "Framework :: NoneBot",
     "Programming Language :: Python :: 3.9",
 ]
 
