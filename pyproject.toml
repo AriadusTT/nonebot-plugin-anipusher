@@ -1,5 +1,5 @@
 [project]
-name = "nonebot-plugin-AniPusher"
+name = "nonebot_plugin_anipusher"
 version = "0.1.0"
 description = "NoneBot plugin for pushing ani-rss/emby webhooks to QQ"
 authors = [
@@ -9,6 +9,16 @@ license = { text = "MIT" }
 readme = "README.md"
 urls = { Repository = "https://github.com/AriadusTT/nonebot-plugin-AniPusher" }
 requires-python = ">=3.9, <4.0"
+dependencies = [
+    "nonebot-plugin-apscheduler",
+    "httpx",
+    "aiohttp==3.11.14",
+    "DBUtils==3.1.0",
+    "fastapi==0.116.1",
+    "nonebot==1.9.1",
+    "pydantic==1.10.21",
+    "python-dotenv==1.1.1"
+]
 classifiers = [
     "Framework :: NoneBot",
     "Programming Language :: Python :: 3.9",
