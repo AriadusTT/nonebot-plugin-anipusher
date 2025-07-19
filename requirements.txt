@@ -1,6 +1,6 @@
-aiohttp==3.11.14
-DBUtils==3.1.0
-fastapi==0.116.1
-nonebot==1.9.1
-pydantic==1.10.21
-python-dotenv==1.1.1
+aiohttp>=3.11.14
+DBUtils>=3.1.0
+fastapi>=0.116.1
+nonebot>=2.4.0
+pydantic>=1.10.21
+python-dotenv>=1.0.1

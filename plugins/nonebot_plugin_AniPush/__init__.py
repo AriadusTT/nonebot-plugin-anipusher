@@ -9,5 +9,4 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/AriadusTT/nonebot-plugin-anipusher",
     supported_adapters={"~onebot.v11"}
 )
-
 from . import starter
