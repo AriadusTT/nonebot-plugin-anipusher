@@ -1,0 +1,2 @@
+# nonebot_plugin_anipusher
+nonebot_plugin_anipusher
