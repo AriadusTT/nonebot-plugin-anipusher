@@ -2,9 +2,7 @@
 name = "nonebot_plugin_anipusher"
 version = "0.1.0"
 description = "NoneBot plugin for pushing ani-rss/emby webhooks to QQ"
-authors = [
-    { name = "AriadusTT", email = "980868243@qq.com" }
-]
+authors = [{ name = "AriadusTT", email = "980868243@qq.com" }]
 license = { text = "MIT" }
 readme = "README.md"
 urls = { Repository = "https://github.com/AriadusTT/nonebot-plugin-AniPusher" }
@@ -38,7 +36,7 @@ select = ["F", "E", "W", "I"]  # 仅保留基础检查
 ignore = ["E402"]
 
 [build-system]
-requires = ["setuptools>=42"]  # 替代 uv_build
+requires = ["setuptools>=65.0.0", "wheel"]  # 替代 uv_build
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
