@@ -41,6 +41,3 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["plugins"]
-
-[tool.setuptools.package-data]
-onebot_plugin_anipusher = ["plugins/nonebot_plugin_AniPush/others/placeholder_image.png"]
