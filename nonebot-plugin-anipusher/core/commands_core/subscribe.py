@@ -1,4 +1,3 @@
-from ast import Pass
 from nonebot_plugin_waiter import prompt, prompt_until
 from nonebot import get_driver, on_command, logger
 from nonebot.matcher import Matcher
@@ -7,6 +6,7 @@ from nonebot.adapters.onebot.v11 import Message
 from ...external import TmdbRequest
 from ...config import FUNCTION
 from ...constants.error_handling import AppError
+from ...database import DatabaseTables,GeneralDatabaseOperate,SQLiteQueryBuilder
 driver = get_driver()
 
 
@@ -188,20 +188,9 @@ class subscribeTask:
     """
     订阅任务类，用于处理订阅相关操作
     """
-
+    # 1.检查数据库中是否存在对应的项目
     @staticmethod
-    async def add_subscription_to_db(
-        tmdb_id: int,
-        item_data: dict,
-        user_id: int,
-        group_id: int
-    ):
-        """
-        添加订阅到数据库
-        :param tmdb_id: 订阅的剧集ID
-        :param item_data: 剧集数据
-        :param user_id: 用户ID
-        :param group_id: 群组ID（可选）
-        """
-        # 这里可以添加具体的数据库操作逻辑
-        pass
+    async def check_tmdb_id_in_db(tmdbid: int):
+        """检查数据库中是否存在对应的项目"""
+        
+
