@@ -18,6 +18,14 @@ unregister_emby_push = on_command(
 unregister_anirss_push = on_command(
     "取消AniRSS推送", aliases={"取消AniRSS推送服务", "取消AniRSS推送功能", "取消AniRSS推送功能服务", "禁用AniRSS推送"})
 
+temp_block_push = on_command(
+    "屏蔽推送"
+)
+
+restart_push = on_command(
+    "重启推送"
+)
+
 
 @register_emby_push.handle()
 async def register_emby(event: PrivateMessageEvent | GroupMessageEvent):
@@ -237,3 +245,42 @@ async def unregister_anirss(event: PrivateMessageEvent | GroupMessageEvent):
     except Exception as e:
         logger.opt(colors=True).error(f"Register：<r>{str(e)}</r>")
         await unregister_anirss_push.finish(f"Error：{str(e)}")
+
+
+@temp_block_push.handle()
+async def temp_block_push_handle():
+    logger.opt(colors=True).info("匹配命令：<g>屏蔽推送</g>")
+    try:
+        # 保存当前用户的推送目标
+        push_target = {
+            "PrivatePushTarget": PUSHTARGET.PrivatePushTarget,
+            "GroupPushTarget": PUSHTARGET.GroupPushTarget
+        }
+        JsonIO.update_json(TARGET_PATH, push_target)
+        # 清空当前用户的推送目标
+        PUSHTARGET.PrivatePushTarget.clear()
+        PUSHTARGET.GroupPushTarget.clear()
+        await temp_block_push.finish("推送已屏蔽")
+    except FinishedException:
+        # 直接忽略FinishedException
+        pass
+    except Exception as e:
+        logger.opt(colors=True).error(f"屏蔽推送异常：<r>{str(e)}</r>")
+        await temp_block_push.finish(f"屏蔽推送失败，请检查日志{e}")
+
+
+@restart_push.handle()
+async def restart_push_handle():
+    logger.opt(colors=True).info("匹配命令：<g>重启推送</g>")
+    try:
+        # 恢复之前保存的推送目标
+        push_target = JsonIO.read_json(TARGET_PATH)
+        PUSHTARGET.PrivatePushTarget = push_target.get("PrivatePushTarget", {})
+        PUSHTARGET.GroupPushTarget = push_target.get("GroupPushTarget", {})
+        await restart_push.finish("推送已恢复")
+    except FinishedException:
+        # 直接忽略FinishedException
+        pass
+    except Exception as e:
+        logger.opt(colors=True).error(f"重启推送异常：<r>{str(e)}</r>")
+        await restart_push.finish(f"重启推送失败，请检查日志{e}")
