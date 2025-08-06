@@ -2,8 +2,8 @@
 from nonebot import get_driver
 from nonebot.drivers import URL, Request, Response, ASGIMixin, HTTPServerSetup
 import asyncio
+from ipaddress import ip_address
 from nonebot import logger
-from .processing_engine import DataProcessor
 
 
 class Monitor:
@@ -18,8 +18,9 @@ class Monitor:
         """
         async def handle_webhook(request: Request) -> Response:
             data = request.json
-            logger.opt(colors=True).info(f"<lg>收到新的监控请求</lg>\n{data}")
-            asyncio.create_task(DataProcessor.create_and_run(data))
+            logger.opt(colors=True).info(f"<lg>获取到新的推送消息：</lg>\n{data}")
+            # 在此处添加 处理流程
+
             return Response(200,
                             headers={"Content-Type": "application/json"},
                             content="ok")

@@ -26,7 +26,7 @@ adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
 ]
 plugins = ["nonebot_plugin_apscheduler"]
-plugin_dirs = ["nonebot-plugin-anipusher"]
+plugin_dirs = [""]
 
 
 [tool.ruff]

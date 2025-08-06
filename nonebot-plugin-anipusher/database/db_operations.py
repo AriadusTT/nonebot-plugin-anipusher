@@ -1,20 +1,21 @@
-from .table_structure import DatabaseTables
+from .db_models import DatabaseTables
 from .query_builder import SQLiteQueryBuilder
-from ..constants.error_handling import AppError
+from ..exceptions import AppError
+from .database_manager import DatabaseManager
 
 
-class GeneralDatabaseOperate:
+class DatabaseService:
+
     # 插入或更新数据到指定表
     @staticmethod
-    async def insert_or_update_data(conn,
-                                    table_name: DatabaseTables.TableName,
-                                    data: dict,
-                                    conflict_columns: list[str] = []
-                                    ) -> None:
+    async def upsert_data(
+        table_name: DatabaseTables.TableName,
+        data: dict,
+        conflict_columns: list[str] = []
+    ) -> None:
         """
         插入或更新数据到指定表
         Args:
-            conn: 数据库连接
             table_name: 表名
             data: 要插入的数据字典
             conflict_columns: 冲突列名列表
@@ -38,27 +39,28 @@ class GeneralDatabaseOperate:
         if not sql:
             raise AppError.Exception(
                 AppError.UnknownError, "意外的错误：没有获取到生成的语句")
-        # 执行SQL语句
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(sql, data)
-                conn.commit()
-        except Exception as e:
-            raise AppError.Exception(AppError.UnknownError, f"数据库执行错误：{e}")
+        async with DatabaseManager.get_connection() as conn:
+            # 执行SQL语句
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql, data)
+                    await conn.commit()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
 
     # 查询数据
     @staticmethod
-    async def select_data(conn,
-                          table_name: DatabaseTables.TableName,
-                          columns: list[str] = [],
-                          where: dict = {},
-                          order_by: str | None = None,
-                          limit: int | None = None,
-                          offset: int | None = None):
+    async def select_data(
+            table_name: DatabaseTables.TableName,
+            columns: list[str] = [],
+            where: dict = {},
+            order_by: str | None = None,
+            limit: int | None = None,
+            offset: int | None = None):
         """
         查询数据
         Args:
-            conn: 数据库连接
             table_name: 表名
             columns: 要查询的列名列表，None表示所有列
             where: WHERE条件字典 {列名: 值}
@@ -81,21 +83,23 @@ class GeneralDatabaseOperate:
         if not sql:
             raise AppError.Exception(
                 AppError.UnknownError, "意外的错误：没有获取到生成的语句")
-        # 执行SQL语句
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(sql)
-                return cursor.fetchall()
-        except Exception as e:
-            raise AppError.Exception(AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+        async with DatabaseManager.get_connection() as conn:
+            # 执行SQL语句
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql)
+                    return await cursor.fetchall()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
 
     @staticmethod
-    async def update_data(conn,
-                          table_name: DatabaseTables.TableName,
-                          update_columns: dict,
-                          where: dict,
-                          conflict_columns: list[str] = []
-                          ):
+    async def update_data(
+        table_name: DatabaseTables.TableName,
+        update_columns: dict,
+        where: dict,
+        conflict_columns: list[str] = []
+    ):
         """
         更新数据库表中的数据。
 
@@ -145,10 +149,12 @@ class GeneralDatabaseOperate:
         if not sql:
             raise AppError.Exception(
                 AppError.UnknownError, "意外的错误：没有获取到生成的语句")
-        # 执行SQL语句
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(sql)
-                conn.commit()
-        except Exception as e:
-            raise AppError.Exception(AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+        async with DatabaseManager.get_connection() as conn:
+            # 执行SQL语句
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql)
+                    await conn.commit()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")

@@ -49,6 +49,7 @@ class AppError(Enum):
     DatabaseError = (2001, "数据库错误")
     DatabaseInitError = (2002, "数据库初始化错误")
     DatabaseDaoError = (2003, "数据库DAO错误")
+    DatabaseBusyError = (2004, "数据库繁忙")
 
     RequestError = (3000, "请求错误")
 

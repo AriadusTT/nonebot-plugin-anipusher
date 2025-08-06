@@ -1,68 +1,97 @@
-
-import sqlite3
-import threading
-from pathlib import Path
-from dbutils.pooled_db import PooledDB
-
-from ..constants.error_handling import AppError
-
-"""
-    数据库连接池管理类
-
-    该类提供了线程安全的SQLite数据库连接池管理功能，包括：
-    - 获取数据库连接 (get_connection)
-    - 关闭连接池 (close_pool)
-
-    使用单例模式和线程锁确保线程安全，最大连接数默认为10。
-    异常处理使用自定义的AppError异常体系。
-
-    注意：_create_pool, _init_pool是内部实现方法，不建议直接调用。
-"""
+import aiosqlite
+import asyncio
+from contextlib import asynccontextmanager
+from ..config import WORKDIR
+from ..exceptions import AppError
+from typing import Optional
 
 
 class DatabaseManager:
-    _pool = None
-    _init_lock = threading.Lock()  # 新增初始化锁
+    _instance = None
+    _init_lock = asyncio.Lock()
+    _max_connections = 20
+    _pool: Optional[asyncio.Queue[aiosqlite.Connection]] = None
+    _current_connections = 0
 
-    @classmethod  # 获取数据库连接
-    def get_connection(cls):
-        """获取数据库连接（线程安全）"""
+    def __new__(cls):
+        """单例模式，确保只有一个实例"""
+        # 如果实例不存在，则创建一个实例
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        # 返回实例
+        return cls._instance
+
+    @classmethod
+    async def initialize(cls) -> None:
+        """初始化连接池"""
         if cls._pool is None:
-            cls._init_pool()
-        if cls._pool is None:
-            raise AppError.Exception(AppError.DatabaseInitError, "数据库连接池初始化异常")
-        return cls._pool.connection()
+            async with cls._init_lock:
+                if cls._pool is None:
+                    cls._pool = asyncio.Queue(maxsize=cls._max_connections)
+                    for _ in range(cls._max_connections):
+                        conn = await cls._create_connection()
+                        await cls._pool.put(conn)  # 将连接放入连接池
 
-    @classmethod  # 关闭连接池
-    def close_pool(cls):
-        """关闭连接池并释放资源"""
-        with cls._init_lock:
-            if cls._pool:
-                cls._pool.close()
-                cls._pool = None
+    @classmethod
+    @asynccontextmanager
+    async def get_connection(cls):
+        """获取数据库连接的上下文管理器"""
+        if cls._pool is None:  # 如果连接池为空，则初始化连接池
+            await cls.initialize()
 
-    @classmethod  # 初始化连接池
-    def _init_pool(cls):
-        with cls._init_lock:  # 使用锁来确保线程安全
-            if cls._pool is None:
-                cls._pool = cls._create_pool()
-
-    @staticmethod  # 创建连接池
-    def _create_pool():
-        db_path = Path(__file__).resolve(
-        ).parent / "database.db"
         try:
-            # 创建连接池
-            pool = PooledDB(
-                creator=sqlite3,
-                maxconnections=10,
-                database=db_path,
-                blocking=True,
-                check_same_thread=False  # 允许跨线程操作
-            )  # 创建连接池sqlite3，大小为10
-            return pool
-        except sqlite3.Error as e:
-            raise AppError.Exception(AppError.DatabaseError, f"数据库连接池创建失败{e}")
+            if cls._pool is None:
+                raise AppError.Exception(
+                    AppError.DatabaseInitError, "数据库连接池未初始化")
+            # 从连接池中获取连接，等待时间为5秒
+            conn = await asyncio.wait_for(cls._pool.get(), timeout=5)
+            cls._current_connections += 1
+            try:
+                yield conn
+            finally:
+                try:
+                    await cls._pool.put(conn)
+                except Exception:
+                    await conn.close()
+                finally:
+                    cls._current_connections -= 1
+        except asyncio.TimeoutError:
+            raise AppError.Exception(
+                AppError.DatabaseBusyError, "获取数据库连接超时")  # 如果获取连接超时，则抛出异常
+
+    @classmethod
+    async def close_pool(cls):
+        """关闭所有连接"""
+        if cls._pool is not None:  # 如果连接池不为空，则关闭所有连接
+            async with cls._init_lock:  # 使用异步上下文管理器，保证在出现异常时，连接仍然能够关闭
+                while not cls._pool.empty():  # 从连接池中取出所有连接，并关闭
+                    conn = await cls._pool.get()
+                    await conn.close()
+                cls._pool = None
+                cls._current_connections = 0
+
+    @staticmethod
+    async def _create_connection() -> aiosqlite.Connection:
+        """创建新的数据库连接"""
+        try:
+            if not WORKDIR.data_file:
+                raise AppError.Exception(
+                    AppError.DatabaseInitError, "数据库文件路径异常！")
+
+            conn = await aiosqlite.connect(
+                database=WORKDIR.data_file,
+                isolation_level=None,
+                check_same_thread=False  # 允许在不同线程之间共享数据库连接
+            )
+
+            await conn.execute("PRAGMA journal_mode=WAL")  # 设置WAL模式
+            await conn.execute("PRAGMA busy_timeout = 5000")  # 设置超时时间
+            return conn
+
+        except aiosqlite.Error as e:
+            raise AppError.Exception(AppError.DatabaseError, f"数据库连接创建失败: {e}")
         except Exception as e:
             raise AppError.Exception(
-                AppError.DatabaseUnknownError, f"未知的数据库错误:{e}")
+                AppError.DatabaseUnknownError,
+                f"未知的数据库错误: {e}"
+            )

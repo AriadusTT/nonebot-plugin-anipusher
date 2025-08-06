@@ -1,5 +1,8 @@
 
+
+from .starter import init_webhook
 from nonebot.plugin import PluginMetadata
+from nonebot import require
 
 __plugin_meta__ = PluginMetadata(
     name="动画推送机",
@@ -9,4 +12,5 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/AriadusTT/nonebot-plugin-anipusher",
     supported_adapters={"~onebot.v11"}
 )
-from . import starter
+
+require("nonebot_plugin_localstore")

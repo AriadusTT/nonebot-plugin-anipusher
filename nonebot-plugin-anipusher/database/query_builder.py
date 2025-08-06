@@ -1,5 +1,5 @@
-from .table_structure import DatabaseTables
-from ..constants.error_handling import AppError
+from .db_models import DatabaseTables
+from ..exceptions import AppError
 
 
 class SQLiteQueryBuilder:
