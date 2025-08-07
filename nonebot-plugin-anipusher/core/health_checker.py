@@ -7,9 +7,13 @@ import json
 from ..database import DBHealthCheck
 import nonebot_plugin_localstore as store
 from ..external import get_request
+from pathlib import Path
+import shutil
 
 
 class HealthCheck:
+    def __init__(self) -> None:
+        self.connect_task = None
 
     @classmethod
     async def create_and_run(cls) -> 'HealthCheck':
@@ -17,18 +21,41 @@ class HealthCheck:
         await instance.run_checks()
         return instance
 
-    async def run_checks(self) -> None:
+    async def run_checks(self) -> bool:
         logger.opt(colors=True).info("<g>HealthCheck</g>：Anipusher自检开始")
-        # 1 读取nonebot localstore路径到全局路径中
-        self._load_localstore_path()
-        # 2 读取用户配置文件
-        self._load_custom_config()
-        # 3 读取推送目标用户文件
-        self._load_user_data()
-        # 4 创建网络测试任务
-        self._create_network_task()
+        try:
+            # 1 读取nonebot localstore路径到全局路径中
+            self._load_localstore_path()
+            # 2 读取用户配置文件
+            self._load_custom_config()
+            # 3 读取推送目标用户文件
+            self._load_user_data()
+            # 4 复制资源文件
+            self._res_transfer()
+            logger.opt(colors=True).info("<g>HealthCheck</g>：配置载入：<g>PASS</g>")
+            # 5 创建网络测试任务
+            self.connect_task = self._create_network_task()
+            # 6 数据库检查
+            await DBHealthCheck.create_and_check()
+            logger.opt(colors=True).info("<g>HealthCheck</g>：数据库：<g>PASS</g>")
+            # 7 动态导入所有数据处理器
+            await self._import_subclasses()
+            logger.opt(colors=True).info("<g>HealthCheck</g>：处理器加载：<g>PASS</g>")
+            # 8 获取网络测试任务结果，并配置功能状态
+            task_result = await self._get_tasks_result()  # 7.1 获取网络测试任务结果
+            parsed_result = self._parse_task_result(
+                task_result)        # 7.2 解析任务结果
+            self._set_push_status(parsed_result)        # 7.3 配置功能状态
+            logger.opt(colors=True).info("<g>HealthCheck</g>：网络联通性：<g>PASS</g>")
+            logger.opt(colors=True).info("<g>HealthCheck</g>：<g>ALL Pass</g>启动监控器")
+            return True
+        except Exception as e :
+            logger.opt(colors=True).error(
+                "<r>HealthCheck</r>：Anipusher<r>自检失败</r>!请检查错误信息，监控器将不会启动")
+            logger.opt(colors=True).error(e)
+            return False
 
-    # 1 读取nonebot localstore路径到全局路径中
+    # 读取nonebot localstore路径到全局路径中
     def _load_localstore_path(self) -> None:
         WORKDIR.cache_dir = store.get_plugin_cache_dir()
         WORKDIR.config_file = store.get_config_file(
@@ -36,7 +63,7 @@ class HealthCheck:
         WORKDIR.data_file = store.get_data_file(
             plugin_name="nonebot-plugin-anipusher", filename="database.db")
 
-    # 2 读取用户配置文件
+    # 读取用户配置文件
     def _load_custom_config(self) -> None:
         try:
             self.config = get_plugin_config(Config).anipush
@@ -52,7 +79,7 @@ class HealthCheck:
             logger.opt(colors=True).error(f"<r>HealthCheck</r>：错误信息：{e}")
             raise
 
-    # 3 读取推送目标用户文件
+    # 读取推送目标用户文件
     def _load_user_data(self) -> None:
         if not WORKDIR.config_file:
             raise AppError.Exception(
@@ -71,7 +98,7 @@ class HealthCheck:
         if private_target := json_data.get("PrivatePushTarget"):
             PUSHTARGET.PrivatePushTarget = private_target
 
-    # 3.1 重建用户数据文件
+    # 重建用户数据文件
     def _reset_user_data(self) -> None:
         try:
             if not WORKDIR.config_file:
@@ -86,7 +113,29 @@ class HealthCheck:
         except Exception as e:
             raise AppError.Exception(AppError.ConfigIOError, f"重置用户数据失败: {e}")
 
-    # 4 创建网络测试任务
+    # 复制资源文件
+    def _res_transfer(self) -> None:
+        res_dir = Path(__file__).resolve(
+        ).parents[1] / "res"
+        if not res_dir.is_dir():
+            raise AppError.Exception(AppError.MissingData,
+                                     f"资源目录缺失: {res_dir}")
+        if not WORKDIR.cache_dir:
+            raise AppError.Exception(AppError.MissingData,
+                                     "<r>HealthCheck</r>：意外的缓存目录变量缺失!")
+        WORKDIR.cache_dir.mkdir(parents=True, exist_ok=True)
+        work_res_dir = WORKDIR.cache_dir / "res"
+        try:
+            if work_res_dir.exists():
+                shutil.rmtree(work_res_dir)
+            shutil.copytree(res_dir, work_res_dir)
+            logger.opt(colors=True).info(
+                "<g>HealthCheck</g>：资源目录已完整复制到localstore")
+        except Exception as e:
+            raise AppError.Exception(AppError.MissingData,
+                                     f"资源目录复制失败: {e}")
+
+    # 创建网络测试任务
     def _create_network_task(self) -> dict:
         emby_base = (APPCONFIG.emby_host or "").rstrip("/")
         emby_key = APPCONFIG.emby_key or ""
@@ -108,7 +157,84 @@ class HealthCheck:
                                                                headers=tmdb_headers,
                                                                proxy=APPCONFIG.proxy))
         }
-        logger.opt(colors=True).info("HealthCheck：<g>网络测试任务已创建</g>")
         return tasks
 
-    # 5.数据库检查
+    # 动态导入所有数据处理器
+    async def _import_subclasses(self) -> None:
+        """
+        扫描项目文件夹，动态导入所有模块并查找 AbstractDataProcessor 的子类
+        Returns:
+            list[type[AbstractDataProcessor]]: 找到的所有子类列表
+        Raises:
+            AppError: 如果基类无效或导入过程中发生严重错误
+        """
+        pass
+
+    # 获取网络测试任务结果
+    async def _get_tasks_result(self) -> dict:
+        if not self.connect_task:
+            raise AppError.Exception(AppError.MissingData, "连接检查任务不存在")
+        try:
+            results = await asyncio.gather(
+                *self.connect_task.values(),
+                return_exceptions=True
+            )  # 获取所有任务的执行结果
+            # 返回 {task_name: result} 字典
+            return {
+                name: res for name, res in zip(self.connect_task.keys(), results)
+            }
+        except asyncio.CancelledError:
+            raise AppError.Exception(
+                AppError.UnknownError, "<r>HealthCheck</r>：连接检查任务已取消")
+        except Exception as e:
+            raise AppError.Exception(
+                AppError.UnknownError, f"<r>HealthCheck</r>：连接检查任务异常: {e}") from e
+
+    # 解析任务结果
+    def _parse_task_result(self, task_result: dict) -> dict:
+        parsed = {}
+        for task_name, res in task_result.items():
+            success = not isinstance(res, Exception)
+            parsed[task_name] = {
+                "success": success,
+                "error": str(res) if not success else None
+            }
+            if not success:
+                logger.opt(colors=True).warning(f"{task_name} failed <y>{type(res).__name__}</y>")
+        return parsed
+
+    # 根据网络测试结果，决定是否启用推送功能
+    def _set_push_status(self, parsed_result: dict) -> None:
+        if not parsed_result:
+            raise AppError.Exception(AppError.ParamNotFound, "意外的错误，解析结果为空")
+        try:
+            # Emby功能开关 (需要ping和info都成功)
+            ping_emby_ok = parsed_result.get("ping_emby", {}).get("success", False)
+            info_emby_ok = parsed_result.get("info_emby", {}).get("success", False)
+            FUNCTION.emby_enabled = ping_emby_ok and info_emby_ok
+            logger.opt(colors=True).info(
+                f"HealthCheck：Emby功能{'<g>已启用</g>' if FUNCTION.emby_enabled else '<r>已禁用</r>'}")
+        except Exception as e:
+            # 全局回退：确保关键功能被禁用
+            FUNCTION.emby_enabled = False
+            logger.opt(colors=True).error(
+                f"<r>HealthCheck</r>：处理 Emby 功能开关时出错，<y>将禁用 Emby 功能</y>: {e}")
+        try:
+            # TMDB功能开关 (直连或代理任一成功即可)
+            tmdb_direct_ok = parsed_result.get("tmdb", {}).get("success", False)
+            tmdb_proxy_ok = parsed_result.get("tmdb_with_proxy", {}).get("success", False)
+            FUNCTION.tmdb_enabled = tmdb_direct_ok or tmdb_proxy_ok
+            # 如果直连成功，则禁用代理
+            if tmdb_direct_ok:
+                APPCONFIG.proxy = None
+            status = (
+                "直连<g>已启用</g>" if tmdb_direct_ok else
+                "代理连接<g>已启用</g>" if tmdb_proxy_ok else
+                "<r>已禁用</r>"
+            )
+            logger.opt(colors=True).info(
+                f"HealthCheck：TMDB功能{status}")
+        except Exception as e:
+            FUNCTION.tmdb_enabled = False
+            logger.opt(colors=True).error(
+                f"<r>HealthCheck</r>：处理 TMDB 功能开关时出错，<y>将禁用 TMDB 功能</y>: {e}")

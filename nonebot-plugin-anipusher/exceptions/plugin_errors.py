@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import NoReturn
 
+
 """
     错误代码枚举和异常处理类
 
@@ -50,8 +51,16 @@ class AppError(Enum):
     DatabaseInitError = (2002, "数据库初始化错误")
     DatabaseDaoError = (2003, "数据库DAO错误")
     DatabaseBusyError = (2004, "数据库繁忙")
+    DatabaseRecordNotFound = (2005, "数据库记录未找到")
+    DatabaseTableNotFound = (2006, "数据库表不存在")
 
     RequestError = (3000, "请求错误")
+    RequestTimeout = (3001, "请求超时")
+    RequestFailed = (3002, "请求失败")
+    RequestInvalidResponse = (3003, "请求返回无效响应")
+    RequestInvalidJson = (3004, "请求返回无效JSON")
+    RequestInvalidUrl = (3005, "请求URL无效")
+    ResponseNotFound = (3006, "响应未找到")
 
     @property
     def code(self):

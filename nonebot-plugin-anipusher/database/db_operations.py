@@ -1,3 +1,5 @@
+
+from typing import Iterable
 from .db_models import DatabaseTables
 from .query_builder import SQLiteQueryBuilder
 from ..exceptions import AppError
@@ -57,7 +59,7 @@ class DatabaseService:
             where: dict = {},
             order_by: str | None = None,
             limit: int | None = None,
-            offset: int | None = None):
+            offset: int | None = None) -> Iterable:
         """
         查询数据
         Args:
@@ -90,16 +92,21 @@ class DatabaseService:
                     await cursor.execute(sql)
                     return await cursor.fetchall()
             except Exception as e:
-                raise AppError.Exception(
-                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+                if "no such table" in str(e).lower():
+                    raise AppError.Exception(
+                        AppError.DatabaseTableNotFound, f"数据库表{table_name}不存在")
+                else:
+                    raise AppError.Exception(
+                        AppError.DatabaseDaoError, f"数据库执行错误：{e}")
 
+    # 更改数据
     @staticmethod
     async def update_data(
         table_name: DatabaseTables.TableName,
         update_columns: dict,
         where: dict,
         conflict_columns: list[str] = []
-    ):
+    ) -> None:
         """
         更新数据库表中的数据。
 
@@ -151,6 +158,95 @@ class DatabaseService:
                 AppError.UnknownError, "意外的错误：没有获取到生成的语句")
         async with DatabaseManager.get_connection() as conn:
             # 执行SQL语句
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql)
+                    await conn.commit()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+
+
+class DatabaseSchemaManager:
+
+    @staticmethod
+    # 异步获取表元数据
+    async def get_table_metadata(table_name: DatabaseTables.TableName) -> Iterable:
+        """
+        获取表元数据
+        Args:
+            table_name: 表名
+        """
+        if not table_name:
+            raise AppError.Exception(
+                AppError.ParamNotFound, "意外的表名参数缺失")
+        if not isinstance(table_name, DatabaseTables.TableName):
+            raise AppError.Exception(
+                AppError.UnSupportedType, "意外的表名参数类型")
+        try:
+            sql = SQLiteQueryBuilder.build_metadata_query(table_name)
+        except Exception as e:
+            raise AppError.Exception(
+                AppError.DatabaseDaoError, f"生成数据库语句异常：{e}")
+        async with DatabaseManager.get_connection() as conn:
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql)
+                    return await cursor.fetchall()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+
+    @staticmethod
+    async def create_table(table_name: DatabaseTables.TableName) -> None:
+        """
+        创建数据库表
+        Args:
+            table_name: 表名
+        """
+        if not table_name:
+            raise AppError.Exception(
+                AppError.ParamNotFound, "意外的表名参数缺失")
+        if not isinstance(table_name, DatabaseTables.TableName):
+            raise AppError.Exception(
+                AppError.UnSupportedType, "意外的表名参数类型")
+        # 执行SQL语句
+        try:
+            columns = DatabaseTables.get_table_schema(
+                table_name)
+            sql = SQLiteQueryBuilder.build_create_table(table_name, columns)
+        except Exception as e:
+            raise AppError.Exception(
+                AppError.DatabaseDaoError, f"获取数据库定义/生成数据库语句异常：{e}")
+        async with DatabaseManager.get_connection() as conn:
+            try:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql)
+                    await conn.commit()
+            except Exception as e:
+                raise AppError.Exception(
+                    AppError.DatabaseDaoError, f"数据库执行错误：{e}")
+
+    @staticmethod
+    async def drop_table(table_name: DatabaseTables.TableName) -> None:
+        """
+        删除数据库表
+        Args:
+            table_name: 表名
+        """
+        if not table_name:
+            raise AppError.Exception(
+                AppError.ParamNotFound, "意外的表名参数缺失")
+        if not isinstance(table_name, DatabaseTables.TableName):
+            raise AppError.Exception(
+                AppError.UnSupportedType, "意外的表名参数类型")
+        # 执行SQL语句
+        try:
+            sql = SQLiteQueryBuilder.build_drop_table(table_name)
+        except Exception as e:
+            raise AppError.Exception(
+                AppError.DatabaseDaoError, f"生成数据库语句异常：{e}")
+        async with DatabaseManager.get_connection() as conn:
             try:
                 async with conn.cursor() as cursor:
                     await cursor.execute(sql)
