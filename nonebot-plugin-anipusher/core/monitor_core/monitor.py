@@ -2,8 +2,8 @@
 from nonebot import get_driver
 from nonebot.drivers import URL, Request, Response, ASGIMixin, HTTPServerSetup
 import asyncio
-from ipaddress import ip_address
 from nonebot import logger
+from .processing_engine import DataProcessor
 
 
 class Monitor:
@@ -20,7 +20,7 @@ class Monitor:
             data = request.json
             logger.opt(colors=True).info(f"<lg>获取到新的推送消息：</lg>\n{data}")
             # 在此处添加 处理流程
-
+            asyncio.create_task(DataProcessor.create_and_run(data))
             return Response(200,
                             headers={"Content-Type": "application/json"},
                             content="ok")

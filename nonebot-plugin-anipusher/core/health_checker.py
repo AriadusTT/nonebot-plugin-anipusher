@@ -1,14 +1,17 @@
 import asyncio
+import json
+import shutil
+import inspect
+import importlib
+import nonebot_plugin_localstore as store
+from pathlib import Path
 from nonebot import logger, get_plugin_config
 from pydantic import ValidationError
-from ..config import Config, APPCONFIG, FUNCTION, PUSHTARGET, WORKDIR
+from .monitor_core.abstract_processor import AbstractDataProcessor
 from ..exceptions import AppError
-import json
 from ..database import DBHealthCheck
-import nonebot_plugin_localstore as store
 from ..external import get_request
-from pathlib import Path
-import shutil
+from ..config import Config, APPCONFIG, FUNCTION, PUSHTARGET, WORKDIR
 
 
 class HealthCheck:
@@ -40,16 +43,19 @@ class HealthCheck:
             logger.opt(colors=True).info("<g>HealthCheck</g>：数据库：<g>PASS</g>")
             # 7 动态导入所有数据处理器
             await self._import_subclasses()
-            logger.opt(colors=True).info("<g>HealthCheck</g>：处理器加载：<g>PASS</g>")
+            logger.opt(colors=True).info(
+                "<g>HealthCheck</g>：处理器加载：<g>PASS</g>")
             # 8 获取网络测试任务结果，并配置功能状态
             task_result = await self._get_tasks_result()  # 7.1 获取网络测试任务结果
             parsed_result = self._parse_task_result(
                 task_result)        # 7.2 解析任务结果
             self._set_push_status(parsed_result)        # 7.3 配置功能状态
-            logger.opt(colors=True).info("<g>HealthCheck</g>：网络联通性：<g>PASS</g>")
-            logger.opt(colors=True).info("<g>HealthCheck</g>：<g>ALL Pass</g>启动监控器")
+            logger.opt(colors=True).info(
+                "<g>HealthCheck</g>：网络联通性：<g>PASS</g>")
+            logger.opt(colors=True).info(
+                "<g>HealthCheck</g>：<g>ALL Pass</g>启动监控器")
             return True
-        except Exception as e :
+        except Exception as e:
             logger.opt(colors=True).error(
                 "<r>HealthCheck</r>：Anipusher<r>自检失败</r>!请检查错误信息，监控器将不会启动")
             logger.opt(colors=True).error(e)
@@ -168,13 +174,50 @@ class HealthCheck:
         Raises:
             AppError: 如果基类无效或导入过程中发生严重错误
         """
-        pass
+        subclasses: list[str] = []
+        base_class = AbstractDataProcessor
+        # 验证基类
+        if not inspect.isclass(base_class):
+            raise AppError.Exception(AppError.UnSupportedType, "基类必须是类对象")
+        # 获取项目根目录
+        processor_dir = Path(__file__).resolve().parent
+        if not processor_dir.is_dir():
+            raise AppError.Exception(AppError.MissingData,
+                                     f"处理器目录缺失: {processor_dir}")
+        # 遍历目录中的所有文件
+        for file in processor_dir.rglob("*.py"):
+            # 跳过不需要的文件
+            if file.name == "__init__.py" or file.name.startswith(("test_", "_")):
+                continue
+            try:
+                # 转换为模块导入路径
+                rel_path = file.relative_to(processor_dir)
+                module_path = '.'.join(rel_path.with_suffix('').parts)
+                full_module_path = f"{__package__}.{module_path}"
+                # 动态导入模块
+                module = importlib.import_module(full_module_path)
+                # 检查模块中的类
+                for _, obj in inspect.getmembers(module, inspect.isclass):
+                    if (issubclass(obj, base_class) and obj is not base_class and obj.__module__ == module.__name__):
+                        subclasses.append(obj.__name__)
+            except ImportError as e:
+                logger.opt(colors=True).warning(
+                    f"<y>HealthCheck</y>：模块导入失败: <r>{file.name}</r> - {str(e)}")
+                continue  # 跳过无法导入的模块而不是终止
+            except Exception as e:
+                logger.opt(colors=True).error(
+                    f"<y>HealthCheck</y>：处理模块时出错: <r>{file}</r> - {str(e)}")
+                continue  # 记录错误但继续处理其他文件
+        logger.opt(colors=True).info(
+            f"<g>HealthCheck</g>：模块导入成功: {subclasses}")
 
     # 获取网络测试任务结果
     async def _get_tasks_result(self) -> dict:
+        # 如果连接检查任务不存在，抛出异常
         if not self.connect_task:
             raise AppError.Exception(AppError.MissingData, "连接检查任务不存在")
         try:
+            # 使用asyncio.gather获取所有任务的执行结果
             results = await asyncio.gather(
                 *self.connect_task.values(),
                 return_exceptions=True
@@ -184,9 +227,11 @@ class HealthCheck:
                 name: res for name, res in zip(self.connect_task.keys(), results)
             }
         except asyncio.CancelledError:
+            # 如果任务被取消，抛出异常
             raise AppError.Exception(
                 AppError.UnknownError, "<r>HealthCheck</r>：连接检查任务已取消")
         except Exception as e:
+            # 如果发生其他异常，抛出异常
             raise AppError.Exception(
                 AppError.UnknownError, f"<r>HealthCheck</r>：连接检查任务异常: {e}") from e
 
@@ -200,7 +245,8 @@ class HealthCheck:
                 "error": str(res) if not success else None
             }
             if not success:
-                logger.opt(colors=True).warning(f"{task_name} failed <y>{type(res).__name__}</y>")
+                logger.opt(colors=True).warning(
+                    f"{task_name} failed <y>{type(res).__name__}</y>")
         return parsed
 
     # 根据网络测试结果，决定是否启用推送功能
@@ -209,8 +255,10 @@ class HealthCheck:
             raise AppError.Exception(AppError.ParamNotFound, "意外的错误，解析结果为空")
         try:
             # Emby功能开关 (需要ping和info都成功)
-            ping_emby_ok = parsed_result.get("ping_emby", {}).get("success", False)
-            info_emby_ok = parsed_result.get("info_emby", {}).get("success", False)
+            ping_emby_ok = parsed_result.get(
+                "ping_emby", {}).get("success", False)
+            info_emby_ok = parsed_result.get(
+                "info_emby", {}).get("success", False)
             FUNCTION.emby_enabled = ping_emby_ok and info_emby_ok
             logger.opt(colors=True).info(
                 f"HealthCheck：Emby功能{'<g>已启用</g>' if FUNCTION.emby_enabled else '<r>已禁用</r>'}")
@@ -221,8 +269,10 @@ class HealthCheck:
                 f"<r>HealthCheck</r>：处理 Emby 功能开关时出错，<y>将禁用 Emby 功能</y>: {e}")
         try:
             # TMDB功能开关 (直连或代理任一成功即可)
-            tmdb_direct_ok = parsed_result.get("tmdb", {}).get("success", False)
-            tmdb_proxy_ok = parsed_result.get("tmdb_with_proxy", {}).get("success", False)
+            tmdb_direct_ok = parsed_result.get(
+                "tmdb", {}).get("success", False)
+            tmdb_proxy_ok = parsed_result.get(
+                "tmdb_with_proxy", {}).get("success", False)
             FUNCTION.tmdb_enabled = tmdb_direct_ok or tmdb_proxy_ok
             # 如果直连成功，则禁用代理
             if tmdb_direct_ok:
