@@ -209,7 +209,7 @@ class HealthCheck:
                     f"<y>HealthCheck</y>：处理模块时出错: <r>{file}</r> - {str(e)}")
                 continue  # 记录错误但继续处理其他文件
         logger.opt(colors=True).info(
-            f"<g>HealthCheck</g>：模块导入成功: {subclasses}")
+            f"<g>HealthCheck</g>：处理器导入成功: {subclasses}")
 
     # 获取网络测试任务结果
     async def _get_tasks_result(self) -> dict:

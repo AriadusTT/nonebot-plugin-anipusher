@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from nonebot import logger
-
+from .processor.anime_process import AnimeProcess
 from ...database import DatabaseTables, DatabaseService
 from ...exceptions import AppError
+from ..push_core.push_service import PushService
 
 
 class AbstractDataProcessor(ABC):  # 数据处理基类
@@ -12,9 +13,7 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
         self.raw_data = data    # 从webhook获取的数据
         self.source: DatabaseTables.TableName = source  # 解析到的数据源
         self.reformated_data = None  # 整形化后的数据
-        self.db_data = None  # 数据库数据
         self.tmdb_id = None  # TMDB ID
-        self.conn = None    # 数据库连接
 
     @classmethod
     def register(cls, source_type):
@@ -50,7 +49,7 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
             return
         # 数据持久化
         try:
-            await self._datapersistence()
+            await self._store_data()
         except (AppError.Exception, Exception) as e:
             logger.opt(colors=True).error(
                 f"<r>{self.source.value}</r>：数据持久化异常：{e}")
@@ -59,11 +58,9 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
         try:
             if self._enable_anime_process():
                 await self._anime_process()
-                logger.opt(colors=True).info(
-                    f"<g>{self.source.value}</g>：Anime数据处理成功")
             else:
                 logger.opt(colors=True).info(
-                    f"</g>{self.source.value}</g>：未启用Anime数据处理")
+                    f"</g>{self.source.value}</g>：Anime处理未启用 <b>跳过</b>")
         except (AppError.Exception, Exception) as e:
             logger.opt(colors=True).error(
                 f"<r>{self.source.value}</r>：Anime数据处理异常：{e}")
@@ -75,7 +72,7 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
                 f"<r>{self.source.value}</r>：推送异常：{e}")
 
     # 数据持久化
-    async def _datapersistence(self):
+    async def _store_data(self):
         if not self.reformated_data:
             raise AppError.Exception(
                 AppError.ParamNotFound, f"<r>{self.source.value}</r>：待持久化的数据为空")
@@ -83,7 +80,7 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
             await DatabaseService.upsert_data(
                 self.source, self.reformated_data)
             logger.opt(colors=True).info(
-                f"<g>{self.source.value}</g>：数据持久化成功")
+                f"<g>{self.source.value}</g>：数据持久化 <g>完成</g>")
         except (AppError.Exception, Exception) as e:
             raise e
 
@@ -93,27 +90,24 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
 
     # 可选项，Anime数据处理
     async def _anime_process(self):
-        # if not self.tmdb_id:
-        #     logger.opt(colors=True).warning(
-        #         f"<y>{self.source.value}</y>：未获取到TMDB ID，跳过Anime数据处理")
-        #     return
-        # if not self.reformated_data:
-        #     logger.opt(colors=True).warning(
-        #         f"<y>{self.source.value}</y>：待处理的数据为空，跳过Anime数据处理")
-        #     return
-        # from .processor.anime_process import AnimeProcess
-        # try:
-        #     anime_process = AnimeProcess(
-        #         self.reformated_data, self.source)
-        #     self.db_data = await anime_process.process()
-        # except Exception as e:
-        #     raise e
-        pass
+        if not self.tmdb_id:
+            logger.opt(colors=True).warning(
+                f"<y>{self.source.value}</y>：未获取到TMDB ID，跳过Anime数据处理")
+            return
+        if not self.reformated_data:
+            logger.opt(colors=True).warning(
+                f"<y>{self.source.value}</y>：待处理的数据为空，跳过Anime数据处理")
+            return
+        try:
+            anime_process = AnimeProcess(
+                self.reformated_data, self.source)
+            await anime_process.process()
+        except Exception as e:
+            raise e
 
     # 数据推送
     async def _push(self) -> None:
-        # await Pusher.create_and_run(self.source)
-        pass
+        await PushService.create_and_run(self.source)
 
     # 需要子类实现的抽象方法
     # 数据格式化
