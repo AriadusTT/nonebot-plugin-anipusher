@@ -144,7 +144,7 @@ class DatabaseTables:
         return list(cls.TableName)
 
     @classmethod
-    def generate_default_dict(cls, table_name: TableName) -> dict[str, object]:
+    def generate_default_schema(cls, table_name: TableName) -> dict[str, object]:
         """
         生成默认值字典
         Args:

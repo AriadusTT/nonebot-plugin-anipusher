@@ -8,7 +8,7 @@ from ....config import FUNCTION
 from ....database import DatabaseTables
 from ..abstract_processor import AbstractDataProcessor
 from ....exceptions import AppError
-from ....utils import TimeUtils
+from ....utils import CommonUtils
 from ....external import TmdbClient
 from typing import cast, Literal
 
@@ -18,7 +18,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
 
     async def _reformat(self) -> None:
         try:
-            default_dict = DatabaseTables.generate_default_dict(
+            default_dict = DatabaseTables.generate_default_schema(
                 self.source)
         except Exception as e:
             raise AppError.Exception(
@@ -117,7 +117,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
 
         def extract_timestamp(self) -> str:
             """提取时间戳"""
-            return TimeUtils().get_timestamp()
+            return CommonUtils().get_timestamp()
 
         def extract_item(self) -> Any | None:
             """提取Item"""

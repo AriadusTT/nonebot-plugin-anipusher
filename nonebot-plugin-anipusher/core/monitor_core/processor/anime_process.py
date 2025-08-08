@@ -62,9 +62,9 @@ class AnimeProcess:
             extract = self.DataExtraction(
                 self.data, self.data_source)  # 初始化数据提取类
             # 配置默认项
-            default_dict = DatabaseTables.generate_default_dict(
-                DatabaseTables.TableName.ANIME)  # 获取默认模板结构
-            default_dict.update({
+            default_schame = DatabaseTables.generate_default_schema(
+                DatabaseTables.TableName.ANIME).copy()  # 获取默认模板结构
+            default_schame.update({
                 "id": None,  # 配置默认发送状态
                 "emby_title": extract.extract_emby_title(),
                 "tmdb_title": extract.extract_tmdb_title(),
@@ -75,10 +75,10 @@ class AnimeProcess:
                 "ani_rss_image": await extract.extract_ani_rss_image(),
                 "emby_series_tag": await extract.extract_emby_series_tag(),
                 "emby_series_url": extract.extract_emby_series_url(),
-                "group_subscriber": extract.extract_subscriber(),
-                "private_subscriber": extract.extract_subscriber()
+                "group_subscriber": None,
+                "private_subscriber": None
             })
-            return default_dict
+            return default_schame
         except (AppError.Exception, Exception) as e:
             raise AppError.Exception(
                 AppError.UnknownError, f"{self.data_source.value}：数据格式化异常：{e}")
@@ -170,9 +170,6 @@ class AnimeProcess:
             else:
                 return None
 
-        def extract_subscriber(self) -> str | None:
-            return None
-
     async def _get_data_from_database(self) -> tuple:
         try:
             db_data = await DatabaseService.select_data(
@@ -205,7 +202,7 @@ class AnimeProcess:
         Returns:
             数据字典
         """
-        table_schema = DatabaseTables.generate_default_dict(
+        table_schema = DatabaseTables.generate_default_schema(
             DatabaseTables.TableName.ANIME)  # 获取默认模板结构
         if not db_data:
             return table_schema.copy()
@@ -222,8 +219,9 @@ class AnimeProcess:
         Returns:
             anime表结构
         """
-        force_fields = ["subscriber"]  # 强制维持字段，该些字段不会从新数据中获取
-        anime_schema = DatabaseTables.generate_default_dict(
+        force_fields = ["group_subscriber",
+                        "private_subscriber"]  # 强制维持字段，该些字段不会从新数据中获取
+        anime_schema = DatabaseTables.generate_default_schema(
             DatabaseTables.TableName.ANIME).copy()  # 获取默认模板结构
         if not self.reformated_data:
             raise AppError.Exception(

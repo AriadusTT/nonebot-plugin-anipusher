@@ -5,7 +5,7 @@ from nonebot import logger
 from ..abstract_processor import AbstractDataProcessor
 from ....database import DatabaseTables
 from ....exceptions import AppError
-from ....utils import TimeUtils
+from ....utils import CommonUtils
 
 
 @AbstractDataProcessor.register(DatabaseTables.TableName.ANI_RSS)
@@ -14,7 +14,7 @@ class AniRSSProcessor(AbstractDataProcessor):
 
     async def _reformat(self):
         try:
-            default_dict = DatabaseTables.generate_default_dict(
+            default_dict = DatabaseTables.generate_default_schema(
                 self.source)
         except Exception as e:
             raise AppError.Exception(
@@ -86,7 +86,7 @@ class AniRSSProcessor(AbstractDataProcessor):
             self.data = data
 
         def extract_timestamp(self) -> str:
-            return TimeUtils.get_timestamp()
+            return CommonUtils.get_timestamp()
 
         def extract_action(self) -> str | None:
             return self.data.get("action")
