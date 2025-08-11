@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from pathlib import Path
 from typing import Literal
 from nonebot import logger
@@ -185,15 +186,15 @@ class ImageProcessor:
                 f"<y>Pusher</y>：图片写入失败，错误信息：{e}")
             return False
         try:
-            temp_path.replace(img_path)
+            shutil.move(temp_path, img_path)
         except Exception as e:
             logger.opt(colors=True).warning(
                 f"<y>Pusher</y>：图片替换失败，错误信息：{e}")
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as e:
+                    logger.opt(colors=True).warning(
+                        f"<y>Pusher</y>：临时图片删除失败，错误信息：{e}")
             return False
-        if temp_path.exists():
-            try:
-                temp_path.unlink()
-            except Exception as e:
-                logger.opt(colors=True).warning(
-                    f"<y>Pusher</y>：临时图片删除失败，错误信息：{e}")
         return img_path

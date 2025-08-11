@@ -14,3 +14,5 @@ async def init_webhook():
     from .core.monitor_core.monitor import Monitor
     moniter = Monitor()
     await moniter.start_monitor()
+    # 启动命令匹配
+    from .core import commands_core

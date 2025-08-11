@@ -38,6 +38,8 @@ class AnimeProcess:
             self._merge_to_anime_schema()
             # 数据更新
             await self._update_to_database()
+            logger.opt(colors=True).info(
+                f"<g>{self.data_source.value}</g>：数据持久化 <g>完成</g>")
         except Exception as e:
             raise e
 

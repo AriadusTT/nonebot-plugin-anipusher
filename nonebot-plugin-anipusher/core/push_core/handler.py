@@ -31,7 +31,6 @@ class PushService:
 
     # 主流程
     async def process(self):
-        logger.opt(colors=True).info("<g>Pusher</g>：推送任务 <g>开始</g>")
         if not self.source or not isinstance(self.source, DatabaseTables.TableName):
             raise AppError.Exception(AppError.ParamNotFound, "未指定数据源或数据源类型错误")
         # 检查是否有未发送的数据
@@ -68,8 +67,8 @@ class PushService:
         # 更新数据库
         await self._modify_send_status()
         logger.opt(colors=True).info(
-            "<g>Pusher</g>：数据库发送状态更新<g>完成</g>")
-        logger.opt(colors=True).info("<g>Pusher</g>：推送任务 <g>完成</g> ")
+            "<g>Pusher</g>：数据库发送状态更新 <g>完成</g>")
+        logger.opt(colors=True).info(f"<g>Pusher</g>：{self.tmdb_id} 推送服务 <g>结束</g> ")
         return
 
     async def _search_unsent_data(self):

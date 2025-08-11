@@ -36,7 +36,6 @@ class MessageBuilder:
                 message.append(MessageSegment.text(formatted_text + "\n"))
             except KeyError:
                 pass
-        logger.info(f"构建消息段列表: {message}")
         if message and str(message).endswith("\n"):
             message = Message(str(message).rstrip("\n"))
         return message
