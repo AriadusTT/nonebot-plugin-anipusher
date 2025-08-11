@@ -3,7 +3,7 @@ from nonebot import logger
 from .processor.anime_process import AnimeProcess
 from ...database import DatabaseTables, DatabaseService
 from ...exceptions import AppError
-from ..push_core.push_service import PushService
+from ..push_core import PushService
 
 
 class AbstractDataProcessor(ABC):  # 数据处理基类
@@ -58,6 +58,8 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
         try:
             if self._enable_anime_process():
                 await self._anime_process()
+                logger.opt(colors=True).info(
+                    f"<g>{self.source.value}</g>：Anime处理 <b>完成</b>")
             else:
                 logger.opt(colors=True).info(
                     f"</g>{self.source.value}</g>：Anime处理未启用 <b>跳过</b>")
@@ -66,6 +68,8 @@ class AbstractDataProcessor(ABC):  # 数据处理基类
                 f"<r>{self.source.value}</r>：Anime数据处理异常：{e}")
         # 数据推送
         try:
+            logger.opt(colors=True).info(
+                f"<g>{self.source.value}</g>：推送服务 <b>开始</b>")
             await self._push()
         except (AppError.Exception, Exception) as e:
             logger.opt(colors=True).error(

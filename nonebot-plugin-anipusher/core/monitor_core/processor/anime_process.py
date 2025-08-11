@@ -38,8 +38,6 @@ class AnimeProcess:
             self._merge_to_anime_schema()
             # 数据更新
             await self._update_to_database()
-            logger.opt(colors=True).info(
-                f"<g>{self.data_source.value}</g>：Anime数据处理 <g>完成</g>")
         except Exception as e:
             raise e
 
@@ -236,7 +234,7 @@ class AnimeProcess:
                 anime_schema[key] = self.db_data[key]
         self.merged_data = anime_schema
         logger.opt(colors=True).info(
-            f"{DatabaseTables.TableName.ANIME.value}：数据合并完成，等待保存")
+            f"<g>{self.data_source.value}</g>：Anime数据合并 <g>完成</g>，等待数据持久化")
 
     async def _update_to_database(self) -> None:
         """

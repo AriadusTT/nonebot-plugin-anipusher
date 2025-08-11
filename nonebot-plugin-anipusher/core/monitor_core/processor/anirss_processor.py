@@ -79,7 +79,7 @@ class AniRSSProcessor(AbstractDataProcessor):
         self.reformated_data = default_dict
         self.tmdb_id = tmdb_id
         logger.opt(colors=True).info(
-            f"<g>{self.source.value}</g>：数据整形化完成，已准备好持久化数据")
+            f"<g>{self.source.value}</g>：数据整形化 <g>完成</g>，等待数据持久化")
 
     class DataExtraction:
         def __init__(self, data: dict):

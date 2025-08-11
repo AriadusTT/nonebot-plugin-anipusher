@@ -25,7 +25,7 @@ class HealthCheck:
         return instance
 
     async def run_checks(self) -> bool:
-        logger.opt(colors=True).info("<g>HealthCheck</g>：Anipusher自检开始")
+        logger.opt(colors=True).info("<g>HealthCheck</g>：Anipusher自检 <g>Start</g>")
         try:
             # 1 读取nonebot localstore路径到全局路径中
             self._load_localstore_path()
@@ -35,6 +35,8 @@ class HealthCheck:
             self._load_user_data()
             # 4 复制资源文件
             self._res_transfer()
+            logger.opt(colors=True).info(
+                "<g>HealthCheck</g>：资源配置：<g>PASS</g>")
             logger.opt(colors=True).info("<g>HealthCheck</g>：配置载入：<g>PASS</g>")
             # 5 创建网络测试任务
             self.connect_task = self._create_network_task()
@@ -53,7 +55,7 @@ class HealthCheck:
             logger.opt(colors=True).info(
                 "<g>HealthCheck</g>：网络联通性：<g>PASS</g>")
             logger.opt(colors=True).info(
-                "<g>HealthCheck</g>：<g>ALL Pass</g>启动监控器")
+                "<g>HealthCheck</g>：<g>ALL Pass</g> 启动监控器")
             return True
         except Exception as e:
             logger.opt(colors=True).error(
@@ -100,8 +102,16 @@ class HealthCheck:
             raise AppError.Exception(
                 AppError.MissingData, "<r>HealthCheck</r>：意外丢失文件数据!")
         if group_target := json_data.get("GroupPushTarget"):
+            if not isinstance(group_target, dict):
+                logger.opt(colors=True).error(
+                    "<r>HealthCheck</r>：GroupPushTarget格式错误!请检查user.json")
+                PUSHTARGET.GroupPushTarget = {}
             PUSHTARGET.GroupPushTarget = group_target
         if private_target := json_data.get("PrivatePushTarget"):
+            if not isinstance(private_target, dict):
+                logger.opt(colors=True).error(
+                    "<r>HealthCheck</r>：PrivatePushTarget格式错误!请检查user.json")
+                PUSHTARGET.PrivatePushTarget = {}
             PUSHTARGET.PrivatePushTarget = private_target
 
     # 重建用户数据文件
@@ -135,8 +145,6 @@ class HealthCheck:
             if work_res_dir.exists():
                 shutil.rmtree(work_res_dir)
             shutil.copytree(res_dir, work_res_dir)
-            logger.opt(colors=True).info(
-                "<g>HealthCheck</g>：资源目录已完整复制到localstore")
         except Exception as e:
             raise AppError.Exception(AppError.MissingData,
                                      f"资源目录复制失败: {e}")

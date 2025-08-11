@@ -1,8 +1,5 @@
-from .push_service import PushService
-from .message_pusher import group_msg_pusher, private_msg_pusher
-__all__ = [
+from .handler import PushService
 
-    "PushService",
-    "group_msg_pusher",
-    "private_msg_pusher"
+__all__ = [
+    'PushService',
 ]

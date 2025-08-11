@@ -117,9 +117,9 @@ class DatabaseTables:
             'emby_series_tag': {'type': 'TEXT', 'required': False, 'default': None},
             'emby_series_url': {'type': 'TEXT', 'required': False, 'default': None},
             # 群组订阅者
-            'group_subscriber': {'type': 'TEXT', 'required': False, 'default': None},
+            'group_subscriber': {'type': 'TEXT', 'required': False, 'default': "{}"},
             # 私信订阅者
-            'private_subscriber': {'type': 'TEXT', 'required': False, 'default': None}
+            'private_subscriber': {'type': 'TEXT', 'required': False, 'default': "[]"}
         }
     }
 
