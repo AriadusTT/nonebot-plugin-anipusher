@@ -68,9 +68,9 @@ class HealthCheck:
     def _load_localstore_path(self) -> None:
         WORKDIR.cache_dir = store.get_plugin_cache_dir()
         WORKDIR.config_file = store.get_config_file(
-            plugin_name="nonebot-plugin-anipusher", filename="user.json")
+            plugin_name="nonebot-plugin-anipusher", filename="anipusheruser.json")
         WORKDIR.data_file = store.get_data_file(
-            plugin_name="nonebot-plugin-anipusher", filename="database.db")
+            plugin_name="nonebot-plugin-anipusher", filename="anipusherdb.db")
 
     # 读取用户配置文件
     def _load_custom_config(self) -> None:
