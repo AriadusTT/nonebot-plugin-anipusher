@@ -55,11 +55,12 @@ AniPusher插件 是将特定Webhook消息推送至QQ的插件<br>
 
 > [!IMPORTANT]
 > 首次运行前请确保如下插件配置项已配置，否则插件将无法正常运行！<br>
-> 在.env文件中写入如下4个配置项（示例效果如图），配置项内容请根据下方填写：
-> anipush__emby_host="Emby的服务器地址"
-> anipush__emby_apikey="Emby密钥"
-> anipush__tmdb_apikey="TMDBApiKey"
-> anipush__tmdb_proxy="TMDB代理地址"
+> 在.env文件中写入如下4个配置项（示例效果如图），配置项内容请根据下方填写：<br>
+> anipush__emby_host="Emby的服务器地址"<br>
+> anipush__emby_apikey="Emby密钥"<br>
+> anipush__tmdb_apikey="TMDBApiKey"<br>
+> anipush__tmdb_proxy="TMDB代理地址"<br>
+>![env](./docs/最低配置样式.png)
 
 
 | 配置项 | 必填 | 默认值 | 说明 |
