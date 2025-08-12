@@ -3,14 +3,14 @@ import json
 import asyncio
 import re
 from typing import Any
-import aiohttp
 from nonebot import logger
-from ....config.global_config import FUNCTION
+from ....config import FUNCTION
+from ....database import DatabaseTables
 from ..abstract_processor import AbstractDataProcessor
-from ....database.table_structure import DatabaseTables
-from ....constants.error_handling import AppError
-from ....others.utils import PublicUtils
-from ....external import TmdbRequest
+from ....exceptions import AppError
+from ....utils import CommonUtils
+from ....external import TmdbClient
+from typing import cast, Literal
 
 
 @AbstractDataProcessor.register(DatabaseTables.TableName.EMBY)
@@ -18,7 +18,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
 
     async def _reformat(self) -> None:
         try:
-            default_dict = DatabaseTables.generate_default_dict(
+            default_dict = DatabaseTables.generate_default_schema(
                 self.source)
         except Exception as e:
             raise AppError.Exception(
@@ -52,7 +52,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
                 item_type, item)  # 获取episode
             episode_title = extract.extract_episode_title(
                 item_type, item)  # 获取episode标题
-            tmdb_id, imdb_id, tvdb_id = await extract.extract_id(item)
+            tmdb_id, imdb_id, tvdb_id = await extract.extract_id(item, item_type)
             series_id = extract.extract_series_id(
                 item_type, item)  # 获取series_id
             season_id = extract.extract_season_id(
@@ -117,7 +117,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
 
         def extract_timestamp(self) -> str:
             """提取时间戳"""
-            return PublicUtils.get_timestamp()
+            return CommonUtils().get_timestamp()
 
         def extract_item(self) -> Any | None:
             """提取Item"""
@@ -202,7 +202,7 @@ class EmbyDataProcessor(AbstractDataProcessor):
                 return None
 
         # 注意，该方法为异步方法
-        async def extract_id(self, item):
+        async def extract_id(self, item, item_type):
             """提取ID"""
             if not item:
                 raise AppError.Exception(
@@ -223,53 +223,25 @@ class EmbyDataProcessor(AbstractDataProcessor):
                 return tmdb_id, imdb_id, tvdb_id
             # 如果获取到tmdb_id，尝试验证ID
             if tmdb_id:
-                try:
-                    check_result = await self._verify_id_from_response(int(tmdb_id))
-                    if check_result:
-                        logger.opt(colors=True).info(
-                            f"<g>EMBY</g>：ID验证通过，tmdb_id: {tmdb_id}")
-                    else:
-                        logger.opt(colors=True).warning(
-                            f"<y>EMBY</y>：ID验证未通过，tmdb_id: {tmdb_id}并非系列ID，判断该ID不可用")
-                        tmdb_id = None
-                except (AppError.Exception, Exception) as e:
-                    logger.opt(colors=True).warning(
-                        f"<y>EMBY</y>：ID验证异常：{e},判断该ID不可信")
+                # 如果验证成功直接返回，否则将tmdb_id置为None
+                if await self._verify_id_from_response(int(tmdb_id), item_type):
+                    return tmdb_id, imdb_id, tvdb_id
+                else:
                     tmdb_id = None
-            # 如果验证通过，直接返回
-            if tmdb_id:
-                logger.opt(colors=True).info(
-                    f"<g>EMBY</g>：ID验证通过，tmdb_id: {tmdb_id}")
-                return tmdb_id, imdb_id, tvdb_id
-            # 如果未获取到tmdb_id，则通过异步请求获取
-            try:
-                tasks = []
-                tasks.append(TmdbRequest.get_id_from_online(
-                    imdb_id, "imdb_id"))
-                tasks.append(TmdbRequest.get_id_from_online(
-                    tvdb_id, "tvdb_id"))
-                imdb_res, tvdb_res = await asyncio.gather(*tasks, return_exceptions=True)
-                if all(isinstance(res, BaseException) for res in [imdb_res, tvdb_res]):
-                    logger.opt(colors=True).warning(
-                        "<y>TMDB</y>：请求均失败，返回空ID")
-                    return None, imdb_id, tvdb_id
-                if not isinstance(imdb_res, BaseException):
-                    tmdb_id = self._get_id_from_tmdb_response(imdb_res)
-                    if tmdb_id:
-                        logger.opt(colors=True).info(
-                            f"<g>EMBY</g>：成功从IMDB获取到tmdb_id: {tmdb_id}")
-                        return tmdb_id, imdb_id, tvdb_id
-                if not isinstance(tvdb_res, BaseException):
-                    tmdb_id = self._get_id_from_tmdb_response(tvdb_res)
-                    if tmdb_id:
-                        logger.opt(colors=True).info(
-                            f"<g>EMBY</g>：成功从TVDB获取到tmdb_id: {tmdb_id}")
-                        return tmdb_id, imdb_id, tvdb_id
-                logger.opt(colors=True).info(
-                    "<y>TMDB</y>：所有请求均未获取到TMDB ID，将返回空ID")
-                return None, imdb_id, tvdb_id
-            except (AppError.Exception, Exception):
-                raise
+            # 当tmdb_id失败时，尝试通过第三方id转换获取tmdb_id
+            tasks = [
+                self._convert_external_id_to_tmdb(imdb_id, "imdb_id"),
+                self._convert_external_id_to_tmdb(tvdb_id, "tvdb_id")
+            ]
+            tasks_result = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in tasks_result:
+                if result is not None and not isinstance(result, Exception):
+                    logger.opt(colors=True).info(
+                        f"<y>EMBY</y>：通过第三方ID转换成功，获取到TMDB ID: <b>{result}</b>")
+                    return result, imdb_id, tvdb_id
+            logger.opt(colors=True).warning(
+                "<y>EMBY</y>：所有第三方ID转换均失败，将返回空TMDB ID")
+            return None, imdb_id, tvdb_id
 
         def extract_series_id(self, item_type, item) -> Any | None:
             """提取Series ID"""
@@ -407,72 +379,70 @@ class EmbyDataProcessor(AbstractDataProcessor):
             """提取原始数据"""
             return json.dumps(self.data, ensure_ascii=False)
 
-        def _get_id_from_tmdb_response(self, response: str | None) -> str | None:
-            """从TMDB响应中获取ID"""
-            tmdb_id = None  # 初始化
-            if not response:
-                logger.opt(colors=True).warning(
-                    "<y>TMDB</y> 未获取到返回数据，将返回空ID")
-                return None
-            try:
-                response_json = json.loads(response)
-                if not response_json:
-                    return None
-                # 解析数据
-                tv_results = response_json.get("tv_results", [])
-                tv_episode_results = response_json.get(
-                    "tv_episode_results", [])
-                # 优先使用tv_results
-                if tv_results and tv_results[0].get("show_id"):
-                    tmdb_id = tv_results[0]["show_id"]  # 直接访问，已确认存在
-                # 次选tv_episode_results
-                elif tv_episode_results and tv_episode_results[0].get("show_id"):
-                    tmdb_id = tv_episode_results[0]["show_id"]
-                # 如果都没有，则返回None
-                if not tmdb_id:
-                    return None
-                return tmdb_id
-            except Exception as e:
-                raise AppError.Exception(
-                    AppError.UnknownError, f"TMDB响应解析异常：{e}")
-
-        async def _verify_id_from_response(self, tmdb_id: int) -> bool:
+        async def _verify_id_from_response(self, tmdb_id: int, type: str) -> bool:
             """验证ID是否有效"""
             if not tmdb_id:
                 logger.opt(colors=True).warning(
-                    "<y>TMDB</y> ID为空，无法验证ID")
+                    "<y>TMDB</y>：传入ID为空，TMDB ID验证失败：置空")
+                return False
+            if not type:
+                logger.opt(colors=True).warning(
+                    "<y>TMDB</y>：传入类型为空，TMDB ID验证失败：置空")
+                return False
+            if type not in ["movie", "tv"]:
+                logger.opt(colors=True).warning(
+                    "<y>TMDB</y>：传入类型无效，TMDB ID验证失败：置空")
                 return False
             try:
-                response = await TmdbRequest.tmdb_id_verification(tmdb_id)
+                # 强制转换类型，避免检查器报错
+                valid_type = cast(Literal["movie", "tv"], type)
+                response = await TmdbClient.get_id_details(tmdb_id, valid_type)
                 if not response:
                     logger.opt(colors=True).warning(
-                        "<y>TMDB</y> 未获取到返回数据,失败")
+                        "<r>TMDB</r>：本报警出现代表获取id详细时出现异常抛出空值，请检查！")
                     return False
-                response_json = json.loads(response)
-                if not response_json:
+                if response.get("status_code") == 34 or response.get("success") is False:
                     logger.opt(colors=True).warning(
-                        "<y>TMDB</y> 响应数据为空，失败")
+                        f"<y>TMDB</y>：无效ID，对应类型：{type}，ID：{tmdb_id}页面不存在")
                     return False
-                if response_json.get("status_code") == 34:
-                    logger.opt(colors=True).warning(
-                        f"<y>TMDB</y> ID {tmdb_id} status_code is 34，失败")
-                    return False
-                if response_json.get("success") is False:
-                    logger.opt(colors=True).warning(
-                        f"<y>TMDB</y> ID {tmdb_id} success is false，失败")
-                    return False
+                logger.opt(colors=True).info(
+                    f"<g>TMDB</g>：有效ID，对应类型：{type}，ID：{tmdb_id}页面存在")
                 return True
-            except aiohttp.ClientResponseError as e:
-                if e.status == 404:  # 可以直接访问 status为404，已确认不存在
-                    logger.opt(colors=True).warning(
-                        f"<y>TMDB</y> ID {tmdb_id} 不存在，失败")
-                    return False
-                else:
-                    raise AppError.Exception(
-                        AppError.RequestError, f"TMDB请求异常：{e}")
-            except (AppError.Exception, Exception) as e:
+            except Exception as e:
+                logger.opt(colors=True).warning(
+                    f"<y>TMDB</y>：验证ID时发生异常：{e}")
+                return False
+
+        async def _convert_external_id_to_tmdb(self, external_id: str | None, source: str) -> str | None:
+            """将外部ID转换为TMDB ID"""
+            if not source:
                 raise AppError.Exception(
-                    AppError.UnknownError, f"TMDB ID验证异常：{e}")
+                    AppError.ParamNotFound, "参数缺失！缺少第三方ID来源")
+            if not external_id:
+                return None
+            try:
+                response = await TmdbClient.find_by_external_id(
+                    external_id, source)
+                if not response:
+                    logger.opt(colors=True).warning(
+                        "<r>TMDB</r>：本报警出现代表id转换时出现异常抛出空值，请检查！")
+                    return None
+                for type, items in response.items():
+                    if not items:
+                        continue
+                    # 获取第一个（也是唯一一个）结果
+                    item = items[0]
+                    # 如果是剧集季或剧集，返回 show_id
+                    if type in ["tv_season_results", "tv_episode_results"]:
+                        return item.get("show_id")
+                    # 如果是电影或剧集，返回 id
+                    elif type in ["movie_results", "tv_results"]:
+                        return item.get("id")
+                return None
+            except Exception as e:
+                logger.opt(colors=True).warning(
+                    f"<y>TMDB</y>：外部ID转换时发生异常：{e}")
+                return None
 
     def _enable_anime_process(self):
         """

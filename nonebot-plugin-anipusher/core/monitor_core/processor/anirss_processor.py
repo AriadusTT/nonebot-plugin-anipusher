@@ -3,10 +3,9 @@ import json
 import re
 from nonebot import logger
 from ..abstract_processor import AbstractDataProcessor
-from ....database.table_structure import DatabaseTables
-from ....constants.error_handling import AppError
-from ....others.utils import PublicUtils
-from ....external import get_request
+from ....database import DatabaseTables
+from ....exceptions import AppError
+from ....utils import CommonUtils
 
 
 @AbstractDataProcessor.register(DatabaseTables.TableName.ANI_RSS)
@@ -15,7 +14,7 @@ class AniRSSProcessor(AbstractDataProcessor):
 
     async def _reformat(self):
         try:
-            default_dict = DatabaseTables.generate_default_dict(
+            default_dict = DatabaseTables.generate_default_schema(
                 self.source)
         except Exception as e:
             raise AppError.Exception(
@@ -80,14 +79,14 @@ class AniRSSProcessor(AbstractDataProcessor):
         self.reformated_data = default_dict
         self.tmdb_id = tmdb_id
         logger.opt(colors=True).info(
-            f"<g>{self.source.value}</g>：数据整形化完成，已准备好持久化数据")
+            f"<g>{self.source.value}</g>：数据整形化 <g>完成</g>，等待数据持久化")
 
     class DataExtraction:
         def __init__(self, data: dict):
             self.data = data
 
         def extract_timestamp(self) -> str:
-            return PublicUtils.get_timestamp()
+            return CommonUtils.get_timestamp()
 
         def extract_action(self) -> str | None:
             return self.data.get("action")

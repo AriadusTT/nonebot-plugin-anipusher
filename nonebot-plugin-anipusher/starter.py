@@ -7,9 +7,12 @@ driver = get_driver()
 
 @driver.on_startup
 async def init_webhook():
-    from .core.monitor_core.health_check import NewHealthCheck
-    await NewHealthCheck.create_and_run()
+    # 启动前配置及自检
+    from .core.health_checker import HealthCheck
+    await HealthCheck.create_and_run()
+    # 启动webhook接收器
     from .core.monitor_core.monitor import Monitor
-    MONITOR = Monitor()
-    await MONITOR.start_monitor()
+    moniter = Monitor()
+    await moniter.start_monitor()
+    # 启动命令匹配
     from .core import commands_core

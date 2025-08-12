@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 class AppConfig:
     """存储应用程序配置参数"""
 
@@ -34,7 +37,17 @@ class PushTarget:
     """
 
 
+class WorkDir:
+    """存储缓存/DB/推送对象数据位置的类"""
+
+    def __init__(self):
+        self.cache_dir: Path | None = None  # 图片缓存的路径
+        self.data_file: Path | None = None  # db数据库文件的路径
+        self.config_file: Path | None = None  # 推送对象json文件的路径
+
+
 # 全局单例对象
 APPCONFIG = AppConfig()
 FUNCTION = FeatureFlags()
 PUSHTARGET = PushTarget()
+WORKDIR = WorkDir()

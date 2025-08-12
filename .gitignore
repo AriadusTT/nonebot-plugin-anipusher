@@ -147,3 +147,4 @@ plugins/nonebot_plugin_AniPush/database/database.db
 covers/
 plugins/nonebot_plugin_AniPush/target.json
 **/*.db
+.vscode/settings.json

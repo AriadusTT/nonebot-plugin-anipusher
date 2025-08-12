@@ -1,5 +1,5 @@
-from ...constants.error_handling import AppError
-from ...database.table_structure import DatabaseTables
+from ...exceptions import AppError
+from ...database import DatabaseTables
 from ..monitor_core.abstract_processor import AbstractDataProcessor
 from nonebot import logger
 

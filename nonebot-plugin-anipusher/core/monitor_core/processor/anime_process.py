@@ -1,9 +1,9 @@
 
-from ....database import DatabaseManager, DatabaseTables, GeneralDatabaseOperate
-from ....constants.error_handling import AppError
-from ....config.global_config import FUNCTION, APPCONFIG
-from ....others.utils import PublicUtils
 from nonebot import logger
+from ....exceptions import AppError
+from ....database import DatabaseTables, DatabaseService
+from ....config import APPCONFIG, FUNCTION
+from ....utils import EmbyUtils
 
 
 class AnimeProcess:
@@ -22,42 +22,36 @@ class AnimeProcess:
         self.conn = None
 
     async def process(self):
-        """
-        处理Anime数据
-        返回处理后的Anime数据
-        """
+        try:
+            # 验证参数
+            self._param_validation()
+            # 数据格式化
+            self.reformated_data = await self._reformat()
+            self.tmdb_id = self.reformated_data.get("tmdb_id")  # 获取tmdb_id
+            # 如果没有tmdb_id，则跳过后续处理
+            if not self.tmdb_id:
+                raise AppError.Exception(
+                    AppError.ParamNotFound, "没有获取到TMDB ID")
+            # 数据库查询,并转换为字典
+            self.db_data = self._convert_db_tuple_to_dict(await self._get_data_from_database())
+            # 数据合并
+            self._merge_to_anime_schema()
+            # 数据更新
+            await self._update_to_database()
+            logger.opt(colors=True).info(
+                f"<g>{self.data_source.value}</g>：数据持久化 <g>完成</g>")
+        except Exception as e:
+            raise e
+
+    def _param_validation(self):
         if not self.data:
-            raise ValueError("待处理的数据不能为空")
-        if not isinstance(self.data, dict):
-            raise TypeError(f"待处理的数据类型错误：{type(self.data)}")
+            raise AppError.Exception(AppError.ParamNotFound, "意外的异常，参数缺失")
         if not self.data_source:
-            raise ValueError("数据源不能为空")
+            raise AppError.Exception(AppError.ParamNotFound, "意外的异常，数据源缺失")
+        if not isinstance(self.data, dict):
+            raise AppError.Exception(AppError.UnSupportedType, "参数类型错误")
         if not isinstance(self.data_source, DatabaseTables.TableName):
-            raise TypeError(f"数据源类型错误：{type(self.data_source)}")
-        # 从传入的data中提取必要信息
-        self.reformated_data = await self._reformat()  # 数据格式化
-        self.tmdb_id = self.reformated_data.get("tmdb_id")  # 获取tmdb_id
-        if not self.tmdb_id:
-            raise AppError.Exception(
-                AppError.ParamNotFound, "tmdb_id不能为空，无法进行后续处理")
-        # 数据库操作
-        with DatabaseManager.get_connection() as self.conn:  # 获取数据库连接
-            if not self.conn:
-                raise AppError.Exception(
-                    AppError.DatabaseInitError, "无法获取数据库连接")
-            # 数据库操作
-            self.db_data = self._db_data_to_dict(
-                await self._get_data_from_database())  # 获取数据库数据并转换为字典
-            # logger.opt(colors=True).info(f"{self.data_source.value}:数据库数据重组完成：{self.db_data}")
-            if self.db_data:  # 如果有数据库数据
-                self._merge_data()  # 数据合并
-                # logger.opt(colors=True).info(f"{self.data_source.value}:数据合并完成：{self.merged_data}")
-            else:
-                raise AppError.Exception(
-                    AppError.UnknownError, "未生成模板数据，无法进行后续处理")
-            # 数据库操作
-            await self._insert_data_into_database()  # 数据插入或更新
-        return self.merged_data
+            raise AppError.Exception(AppError.UnSupportedType, "数据源类型错误")
 
     async def _reformat(self):
         """
@@ -68,9 +62,9 @@ class AnimeProcess:
             extract = self.DataExtraction(
                 self.data, self.data_source)  # 初始化数据提取类
             # 配置默认项
-            default_dict = DatabaseTables.generate_default_dict(
-                DatabaseTables.TableName.ANIME)  # 获取默认模板结构
-            default_dict.update({
+            default_schame = DatabaseTables.generate_default_schema(
+                DatabaseTables.TableName.ANIME).copy()  # 获取默认模板结构
+            default_schame.update({
                 "id": None,  # 配置默认发送状态
                 "emby_title": extract.extract_emby_title(),
                 "tmdb_title": extract.extract_tmdb_title(),
@@ -81,10 +75,10 @@ class AnimeProcess:
                 "ani_rss_image": await extract.extract_ani_rss_image(),
                 "emby_series_tag": await extract.extract_emby_series_tag(),
                 "emby_series_url": extract.extract_emby_series_url(),
-                "group_subscriber": extract.extract_subscriber(),
-                "private_subscriber": extract.extract_subscriber()
+                "group_subscriber": None,
+                "private_subscriber": None
             })
-            return default_dict
+            return default_schame
         except (AppError.Exception, Exception) as e:
             raise AppError.Exception(
                 AppError.UnknownError, f"{self.data_source.value}：数据格式化异常：{e}")
@@ -166,7 +160,7 @@ class AnimeProcess:
                         f"{self.data_source.value}:未启用Emby功能，无法获取Emby系列链接")
                     return None
                 try:
-                    return PublicUtils.get_emby_series_url(host, series_id, server_id)
+                    return EmbyUtils.splice_emby_series_url(host, series_id, server_id)
                 except Exception as e:
                     logger.opt(colors=True).warning(
                         f"<y>{self.data_source.value}</y>：获取Emby系列链接异常：{e}")
@@ -176,44 +170,31 @@ class AnimeProcess:
             else:
                 return None
 
-        def extract_subscriber(self) -> str | None:
-            return None
-
     async def _get_data_from_database(self) -> tuple:
-        """
-        从数据库中获取指定tmdb_id的数据
-        Args:
-            table_name: 数据库表名
-            tmdb_id: tmdb_id
-        Returns:
-            数据字典
-        """
-        if not self.tmdb_id:
-            raise AppError.Exception(
-                AppError.ParamNotFound, "tmdb_id不能为空")
-        if not self.conn:
-            raise AppError.Exception(
-                AppError.DatabaseInitError, "未能获取数据库连接")
-        db_data = await GeneralDatabaseOperate.select_data(
-            self.conn,
-            DatabaseTables.TableName.ANIME,
-            where={"tmdb_id": self.tmdb_id}
-        )
+        try:
+            db_data = await DatabaseService.select_data(
+                table_name=DatabaseTables.TableName.ANIME,
+                where={"tmdb_id": self.tmdb_id})
+        except Exception as e:
+            logger.opt(colors=True).error(
+                f"{DatabaseTables.TableName.ANIME.value}：从数据库获取数据异常：{e}")
+            return ()
+        if not isinstance(db_data, list):
+            logger.opt(colors=True).error(
+                f"{DatabaseTables.TableName.ANIME.value}：从数据库获取数据类型错误")
+            return ()
         if not db_data:
             logger.opt(colors=True).warning(
-                f"{self.data_source.value}：未在数据库中找到tmdb_id:{self.tmdb_id}的数据")
-            return ()
-        if not isinstance(db_data, list) or len(db_data) == 0:
-            logger.opt(colors=True).warning(
-                f"{self.data_source.value}：查询结果异常，未找到任何数据")
+                f"{DatabaseTables.TableName.ANIME.value}：从数据库获取数据为空")
             return ()
         if len(db_data) > 1:
-            logger.opt(colors=True).warning(
-                f"{self.data_source.value}：查询结果异常，找到多条数据，取第一条")
-            return ()
+            logger.opt(colors=True).error(
+                f"{DatabaseTables.TableName.ANIME.value}：ANIME表数据异常，tmdb_id重复,请检查数据库")
+            logger.opt(colors=True).info(
+                f"{DatabaseTables.TableName.ANIME.value}：默认选择第一个数据")
         return db_data[0]
 
-    def _db_data_to_dict(self, db_data: tuple) -> dict:
+    def _convert_db_tuple_to_dict(self, db_data: tuple) -> dict:
         """
         将数据库查询结果转换为字典
         Args:
@@ -221,57 +202,51 @@ class AnimeProcess:
         Returns:
             数据字典
         """
-        default_dict = DatabaseTables.generate_default_dict(
+        table_schema = DatabaseTables.generate_default_schema(
             DatabaseTables.TableName.ANIME)  # 获取默认模板结构
         if not db_data:
-            logger.opt(colors=True).warning(
-                f"{self.data_source.value}：未在数据库中找到相关数据，使用默认模板")
-            return default_dict
-
-        if len(db_data) != len(default_dict):
+            return table_schema.copy()
+        if len(db_data) != len(table_schema):
             raise AppError.Exception(
-                AppError.DatabaseDaoError, "数据库查询结果与默认结构不匹配")
-        for key, value in zip(default_dict.keys(), db_data):
-            default_dict[key] = value
-        return default_dict
+                AppError.DatabaseDaoError, f"数据行字段数不匹配(预期:{len(table_schema)}，实际:{len(db_data)})")
+        for key, value in zip(table_schema.keys(), db_data):
+            table_schema[key] = value
+        return table_schema
 
-    def _merge_data(self):
+    def _merge_to_anime_schema(self) -> None:
         """
-        合并数据
-        将格式化后的数据与数据库中的数据进行合并
+        将数据合并到anime表结构中
+        Returns:
+            anime表结构
         """
+        force_fields = ["group_subscriber",
+                        "private_subscriber"]  # 强制维持字段，该些字段不会从新数据中获取
+        anime_schema = DatabaseTables.generate_default_schema(
+            DatabaseTables.TableName.ANIME).copy()  # 获取默认模板结构
         if not self.reformated_data:
             raise AppError.Exception(
-                AppError.ParamNotFound, "reformated_data不能为空")
-        if not self.db_data:
-            logger.opt(colors=True).warning(
-                f"{self.data_source.value}：未在数据库中找到相关数据，使用reformated_data作为合并结果")
-            self.merged_data = self.reformated_data
-            return
-        # 合并逻辑：将reformated_data中的非空字段覆盖db_data中的对应字段
-        default_dict = DatabaseTables.generate_default_dict(
-            DatabaseTables.TableName.ANIME)  # 获取默认模板结构
-        force_fields = ["subscriber"]
-        for key in default_dict:
+                AppError.MissingData, "格式化数据为空，无法合并到anime表结构中")
+        for key in anime_schema:
             if key in force_fields:
-                default_dict[key] = self.db_data[key]
+                anime_schema[key] = self.db_data[key]
                 continue
             if self.reformated_data[key] is not None:
-                default_dict[key] = self.reformated_data[key]
+                anime_schema[key] = self.reformated_data[key]
             else:
-                default_dict[key] = self.db_data[key]
-        self.merged_data = default_dict
+                anime_schema[key] = self.db_data[key]
+        self.merged_data = anime_schema
+        logger.opt(colors=True).info(
+            f"<g>{self.data_source.value}</g>：Anime数据合并 <g>完成</g>，等待数据持久化")
 
-    async def _insert_data_into_database(self):
+    async def _update_to_database(self) -> None:
+        """
+        更新数据库
+        Returns:
+            None
+        """
         if not self.merged_data:
             raise AppError.Exception(
-                AppError.ParamNotFound, "数据合并异常,没有合并后的数据")
-        if not self.conn:
-            raise AppError.Exception(
-                AppError.DatabaseInitError, "未能获取数据库连接")
-        await GeneralDatabaseOperate.insert_or_update_data(
-            self.conn,
-            DatabaseTables.TableName.ANIME,
-            self.merged_data,
-            conflict_columns=["tmdb_id"]
-        )
+                AppError.MissingData, "合并数据为空，无法更新数据库")
+        await DatabaseService.upsert_data(DatabaseTables.TableName.ANIME,
+                                          self.merged_data,
+                                          conflict_columns=["tmdb_id"])

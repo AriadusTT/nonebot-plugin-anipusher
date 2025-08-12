@@ -1,3 +1,6 @@
+from nonebot import get_bot, logger
+
+
 async def private_msg_pusher(msg, private_target: list | None):
     """
     向指定用户发送私聊消息。
@@ -9,7 +12,6 @@ async def private_msg_pusher(msg, private_target: list | None):
     Raises:
         Exception: 如果无法获取nonebot对象，抛出异常。
     """
-    from nonebot import get_bot, logger
     bot = get_bot()
     if not bot:
         raise Exception('nonebot对象获取失败')
@@ -33,7 +35,6 @@ async def group_msg_pusher(msg, group_target: list | None):
     Raises:
         Exception: 如果无法获取nonebot对象，抛出异常。
     """
-    from nonebot import get_bot, logger
     bot = get_bot()
     if not bot:
         raise Exception('nonebot对象获取失败')
