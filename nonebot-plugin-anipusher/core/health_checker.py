@@ -25,7 +25,8 @@ class HealthCheck:
         return instance
 
     async def run_checks(self) -> bool:
-        logger.opt(colors=True).info("<g>HealthCheck</g>：Anipusher自检 <g>Start</g>")
+        logger.opt(colors=True).info(
+            "<g>HealthCheck</g>：Anipusher自检 <g>Start</g>")
         try:
             # 1 读取nonebot localstore路径到全局路径中
             self._load_localstore_path()
@@ -123,7 +124,7 @@ class HealthCheck:
             if not WORKDIR.config_file.parent.is_dir():
                 WORKDIR.config_file.parent.mkdir(parents=True)
             WORKDIR.config_file.write_text(json.dumps(
-                {"GroupPushTarget": [], "PrivatePushTarget": []}, ensure_ascii=False), encoding="utf-8")
+                {"GroupPushTarget": {}, "PrivatePushTarget": {}}, ensure_ascii=False), encoding="utf-8")
             logger.opt(colors=True).info(
                 f"<g>HealthCheck</g>：用户数据文件已重建于{WORKDIR.config_file}")
         except Exception as e:
