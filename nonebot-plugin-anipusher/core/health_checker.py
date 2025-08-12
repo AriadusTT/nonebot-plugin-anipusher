@@ -270,7 +270,7 @@ class HealthCheck:
                 "info_emby", {}).get("success", False)
             FUNCTION.emby_enabled = ping_emby_ok and info_emby_ok
             logger.opt(colors=True).info(
-                f"HealthCheck：Emby功能{'<g>已启用</g>' if FUNCTION.emby_enabled else '<r>已禁用</r>'}")
+                f"HealthCheck：Emby功能 {'<g>已启用</g>' if FUNCTION.emby_enabled else '<r>已禁用</r>'}")
         except Exception as e:
             # 全局回退：确保关键功能被禁用
             FUNCTION.emby_enabled = False
@@ -287,8 +287,8 @@ class HealthCheck:
             if tmdb_direct_ok:
                 APPCONFIG.proxy = None
             status = (
-                "直连<g>已启用</g>" if tmdb_direct_ok else
-                "代理连接<g>已启用</g>" if tmdb_proxy_ok else
+                "直连 <g>已启用</g>" if tmdb_direct_ok else
+                "代理连接 <g>已启用</g>" if tmdb_proxy_ok else
                 "<r>已禁用</r>"
             )
             logger.opt(colors=True).info(
