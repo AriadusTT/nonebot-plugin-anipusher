@@ -389,13 +389,13 @@ class EmbyDataProcessor(AbstractDataProcessor):
                 logger.opt(colors=True).warning(
                     "<y>TMDB</y>：传入类型为空，TMDB ID验证失败：置空")
                 return False
-            if type not in ["movie", "tv"]:
+            if type not in ["Movie", "Episode", "Series"]:
                 logger.opt(colors=True).warning(
                     "<y>TMDB</y>：传入类型无效，TMDB ID验证失败：置空")
                 return False
             try:
                 # 强制转换类型，避免检查器报错
-                valid_type = cast(Literal["movie", "tv"], type)
+                valid_type = cast(Literal["Movie", "Episode", "Series"], type)
                 response = await TmdbClient.get_id_details(tmdb_id, valid_type)
                 if not response:
                     logger.opt(colors=True).warning(

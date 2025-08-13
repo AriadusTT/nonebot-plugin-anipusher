@@ -26,7 +26,7 @@ class EmbyUtils:
         return f"{host.rstrip('/')}/web/index.html#!/item?id={series_id}&serverId={server_id}"
 
     @staticmethod  # 拼接Emby图片链接
-    def splice_emby_image_url(host: str | None, id: str | None, tag: str | None) -> str:
+    def splice_emby_image_url(host: str | None, id: str | int | None, tag: str | None) -> str:
         # 检查参数是否为空
         if not host:
             raise AppError.Exception(AppError.MissingData, "host参数不能为空")
@@ -39,11 +39,11 @@ class EmbyUtils:
         if not isinstance(host, str):
             raise AppError.Exception(
                 AppError.UnSupportedType, f"错误的host类型：{type(host)} expected str")
-        if not isinstance(id, str):
+        if not isinstance(id, str | int):
             raise AppError.Exception(
-                AppError.UnSupportedType, f"错误的id类型：{type(id)} expected str")
+                AppError.UnSupportedType, f"错误的id类型：{type(id)} expected str or int")
         if not isinstance(tag, str):
             raise AppError.Exception(
                 AppError.UnSupportedType, f"错误的tag类型：{type(tag)} expected str")
 
-        return f"{host.rstrip('/')}/emby/Items/{id}/Images/Primary?tag={tag}&quality=90"
+        return f"{host.rstrip('/')}/emby/Items/{str(id)}/Images/Primary?tag={tag}&quality=90"

@@ -76,7 +76,7 @@ class TmdbClient:
         return await TmdbClient._request_tmdb_api(endpoint)
 
     @staticmethod
-    async def get_id_details(id: int, type: Literal["movie", "tv"] = "tv") -> dict | None:
+    async def get_id_details(id: int, type: Literal["Movie", "Episode", "Series"] = "Episode") -> dict | None:
         """异步获取ID的详细信息"""
         if not id:
             raise AppError.Exception(
