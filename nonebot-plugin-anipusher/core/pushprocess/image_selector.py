@@ -170,7 +170,7 @@ class ImageSelector:
                 proxy = None
             else:
                 headers = {
-                    "X-Emby-Token": APPCONFIG.emby_host,
+                    "X-Emby-Token": APPCONFIG.emby_key,
                     "User-Agent": "AriadusTTT/nonebot_plugin_AniPush/1.0.0 (Python)"}
                 proxy = APPCONFIG.proxy
             task = asyncio.create_task(
